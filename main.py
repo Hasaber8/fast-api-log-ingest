@@ -8,13 +8,13 @@ app = FastAPI()
 
 # model for log entries
 class LogEntry(BaseModel):
-    id : str = ""
+    id: str = ""
     service_name: str
     timestamp: datetime = None
-    message = str
+    message: str
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "service_name": "auth-service",
                 "timestamp": "2025-03-17T10:15:00Z",
@@ -33,11 +33,11 @@ def read_root():
 def ingest_log(log_entry: LogEntry):
     # assign uuid4
     if not log_entry.id:
-        log_entry.id = str(uuid4())
+        log_entry.id = str(uuid.uuid4())
     
     # assign timestamp if not provided
     if not log_entry.timestamp:
-        log_entry.timestamp = datetime.now(datetime.timezone.utc)
+        log_entry.timestamp = datetime.utcnow()
     
     log_dict = log_entry.dict()
     logs_db.append(log_dict)
@@ -65,4 +65,3 @@ def fet_logs(
         filtered_logs = [log for log in filtered_logs if log["timestamp"] <= end_time]
     
     return filtered_logs
-
