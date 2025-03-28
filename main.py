@@ -80,10 +80,10 @@ def ingest_log(log_entry: LogEntry):
     return {"id": log_entry.id, "message": "Log entry created successfully"}
 
 @app.get("/log", response_model=List[LogEntry])
-def fet_logs(
+def get_logs(
     service_name: Optional[str] = None,
-    start_time: Optional[datetime] = Query(None, description="Start time in ISO format (YYYY-MM-DDTHH:MM:SS)"),
-    end_time: Optional[datetime] = Query(None, description="End time in ISO format (YYYY-MM-DDTHH:MM:SS)")
+    start: Optional[datetime] = Query(None, description="Start time in ISO format (YYYY-MM-DDTHH:MM:SS)"),
+    end: Optional[datetime] = Query(None, description="End time in ISO format (YYYY-MM-DDTHH:MM:SS)")
 ):
     filtered_logs = logs_db.copy()
     
@@ -91,12 +91,23 @@ def fet_logs(
     if service_name:
         filtered_logs = [log for log in filtered_logs if log["service_name"] == service_name]
     
-    # filter by start time if provided
-    if start_time:
-        filtered_logs = [log for log in filtered_logs if log["timestamp"] >= start_time]
+    # filter by start time if provided - handle timezone-aware vs naive comparison
+    if start:
+        # make sure both datetimes are either naive or aware for comparison
+        if start.tzinfo is not None:
+            # ff start has timezone info but stored timestamps don't, make start naive
+            start = start.replace(tzinfo=None)
+        filtered_logs = [log for log in filtered_logs if log["timestamp"] >= start]
     
-    # filter by end time if provided
-    if end_time:
-        filtered_logs = [log for log in filtered_logs if log["timestamp"] <= end_time]
+    # filter by end time if provided - handle timezone-aware vs naive comparison
+    if end:
+        # make sure both datetimes are either naive or aware for comparison
+        if end.tzinfo is not None:
+            # if end has timezone info but stored timestamps don't, make end naive
+            end = end.replace(tzinfo=None)
+        filtered_logs = [log for log in filtered_logs if log["timestamp"] <= end]
+    
+    # Sort logs by timestamp (oldest first)
+    filtered_logs.sort(key=lambda x: x["timestamp"])
     
     return filtered_logs
