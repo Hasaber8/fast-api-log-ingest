@@ -1,7 +1,8 @@
+import asyncio
 from typing import Union, List, Optional
 from fastapi import FastAPI, Query
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import date, datetime, timedelta
 import uuid
 
 app = FastAPI()
@@ -24,6 +25,40 @@ class LogEntry(BaseModel):
 
 # logs are in-memory for now
 logs_db = []
+
+# cleanup interval in seconds
+CLEANUP_INTERVAL = 3600 # cleanup every hour
+LOG_EXPIRATION_TIME = timedelta(hours=1)
+
+async def cleanup_expired_logs():
+    # bacground task to remove logs older than expiration
+    while True:
+        try:
+            global logs_db
+            current_time = datetime.utcnow()
+            expiration_threshold = current_time - LOG_EXPIRATION_TIME
+
+            log_count_before = len(logs_db)
+
+            # remove expired logs
+            logs_db = [log for log in logs_db if log["timestamp"] > expiration_threshold]
+
+            deleted_count = log_count_before - len(logs_db)
+
+            if deleted_count > 0:
+                print(f"Removed {deleted_count} expired logs")
+            else:
+                print(f"No expired logs found")
+            
+            await asyncio.sleep(CLEANUP_INTERVAL)
+        except Exception as e :
+            print(f"Error in cleanup task: {str(e)}")
+            await asyncio.sleep(CLEANUP_INTERVAL)
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(cleanup_expired_logs())
+    print("Background cleanup task started.")
 
 @app.get("/")
 def read_root():
